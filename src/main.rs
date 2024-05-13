@@ -17,11 +17,18 @@ fn main() {
 
                 println!("accepted new connection");
                 println!("stream: {:?}", stream);
-                stream.read(&mut buffer).unwrap();
+                loop {
+                    let read_count = stream.read(&mut buffer).unwrap();
+                    if read_count == 0 {
+                        break;
+                    }
+                    println!("read_count: {:?}", read_count);
 
-                stream.write(b"+PONG\r\n").unwrap();
+                    stream.write(b"+PONG\r\n").unwrap();
+                }
 
-                println!("received data: {:?}", buffer);
+
+                //println!("received data: {:?}", buffer);
 
             }
             Err(e) => {
