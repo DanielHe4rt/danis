@@ -1,16 +1,20 @@
 // Uncomment this block to pass the first stage
 
-
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::fmt::Debug;
+use anyhow::{anyhow, Result};
 use tokio::net::{TcpListener, TcpStream};
+
+use crate::resp::handler::RespHandler;
+use crate::resp::parser::RespType;
+
+mod resp;
+
 
 #[tokio::main]
 async fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
-    // Uncomment this block to pass the first stage
-    //
     let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
     loop {
@@ -28,21 +32,39 @@ async fn main() {
 }
 
 
-async fn handle_client(mut stream: TcpStream) {
-    {
-        let mut buffer = [0; 1024];
+async fn handle_client(stream: TcpStream) -> Result<()> {
+    println!("stream: {:?}", stream);
 
-        println!("stream: {:?}", stream);
-        loop {
-            let read_count = stream.read(&mut buffer).await.unwrap();
-            if read_count == 0 {
-                break;
-            }
-            println!("read_count: {:?}", read_count);
+    let mut handler = RespHandler::new(stream);
 
-            stream.write(b"+PONG\r\n").await.unwrap();
+    loop {
+        let response = handler.read_value().await?;
+
+        if let Some(response) = response {
+            let (command, args) = extract_value(response)?;
+
+            let value = match command.as_str() {
+                "PING" => RespType::SimpleString(String::from("PONG")),
+                "ECHO" => args.first().unwrap().clone(),
+                _ => { todo!("aqui viado") }
+            };
+
+            handler.write_value(value).await?
         }
+    }
+}
 
-        println!("received data: {:?}", buffer);
+fn extract_value(value: RespType) -> Result<(String, Vec<RespType>)> {
+    match value {
+        RespType::Array(content) => {
+            let command = match content.first().clone() {
+                Some(RespType::BulkString(s)) => Ok(s.clone()),
+                _ => { Err(anyhow!("eae")) }
+            }.unwrap();
+            let args = content.into_iter().skip(1).collect();
+
+            Ok((command, args))
+        }
+        _ => { todo!("deu merda") }
     }
 }
