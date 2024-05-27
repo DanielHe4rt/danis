@@ -6,6 +6,7 @@ pub enum RespType {
     BulkString(String),
     SimpleString(String),
     Array(Vec<RespType>),
+    NullBulkString
 }
 
 impl RespType {
@@ -13,6 +14,15 @@ impl RespType {
         match self {
             RespType::BulkString(s) => format!("${}\r\n{}\r\n", s.len(), s),
             RespType::SimpleString(s) => format!("+{}\r\n", s),
+            RespType::NullBulkString => String::from("$-1\r\n"),
+            _ => panic!("Azedou o parsing!")
+        }
+    }
+
+    pub fn value(self) -> String {
+        match self {
+            RespType::BulkString(s) => s,
+            RespType::SimpleString(s) => s,
             _ => panic!("Azedou o parsing!")
         }
     }
@@ -39,6 +49,7 @@ impl RespParser {
     /// let parser = RespParser::new().transform(buffer);
     ///
     pub fn transform(&self, payload: BytesMut) -> Result<(RespType, usize)> {
+        println!("{:?}", String::from_utf8(payload.to_vec()));
         let command = payload[0] as char;
 
         match command {
@@ -71,7 +82,7 @@ impl RespParser {
             resp_values.push(parsed_resp);
             bytes_consumed += len;
         }
-
+        println!("{:?}", resp_values);
         Ok((RespType::Array(resp_values), bytes_consumed))
     }
 
